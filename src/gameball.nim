@@ -22,3 +22,4 @@ proc update*(this: Ball, dt: float) =
 
 proc render*(this: Ball) =
   circfill(this.x, this.y, this.radius)
+
