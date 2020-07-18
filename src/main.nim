@@ -12,11 +12,16 @@ const
   brickHeight = ((brickAreaHeight - (gap * (rows - 1))) / rows).int
   xOffset = 12 
   yOffset = 16
+  paddleWidth = 48
+  paddleStartLoc: Vector2D = newVector2D(playAreaWidth / 2 - paddleWidth / 2, playAreaHeight.float - 24.0)
 
 var 
   ball: Ball 
   paddle: Paddle
   bricks: seq[Rectangle]
+  isRunning = false
+  lives = 3
+  score = 0
 
 proc onWallBounce() =
   playSound() 
@@ -29,9 +34,10 @@ proc bounceOffWalls(dt: float): bool =
   if moveDist.y > 0:
     let distToWall = playAreaHeight.float - (ball.y + ball.radius.float)
     if moveDist.y >= distToWall:
-      ball.y += distToWall 
-      ball.velocity.y *= -1
-      result = true
+      dec lives
+      ball.velocity = newVector2D(0.0, 0.0)
+      isRunning = false
+
   elif moveDist.y < 0:
     let distToWall = ball.y - ball.radius.float
     if moveDist.y.abs >= distToWall:
@@ -77,12 +83,10 @@ proc collideBallAndPaddle*(dt: float): bool =
     ball.velocity.y *= -1
     return true
 
-proc gameInit() =
-  let paddleWidth = 48
-  paddle = newPaddle(playAreaWidth div 2 - paddleWidth div 2, playAreaHeight - 24, paddleWidth, paddleWidth div 8)
-  ball = newBall(20, paddle.y.float - 4, 4)
-  ball.velocity = (100.0, 270.0)
-  loadAudioFiles()
+proc reset() =
+  paddle = newPaddle(paddleStartLoc.x.int, paddleStartLoc.y.int, paddleWidth, paddleWidth div 8)
+  lives = 3
+  score = 0
   bricks = newSeq[Rectangle]()
 
   for row in 0 .. 5:
@@ -92,6 +96,12 @@ proc gameInit() =
       let rect = (x, y, brickWidth, brickHeight)
       bricks.add(rect)
 
+proc gameInit() =
+  loadFont(0, "font.png")
+  loadAudioFiles()
+  ball = newBall(0, 0, 4)
+  reset()
+  
 proc destroyBrick(index: int) =
   bricks.delete(index) 
 
@@ -99,22 +109,38 @@ proc collideWithBricks(displacement: Vector2D): bool =
   for i, brick in bricks:
     if collide(ball, brick, displacement):
       destroyBrick(i)
+      inc score
       return true
     
   return false
 
-proc gameUpdate(dt: float32) =
-  let 
-    mouseX = mouse()[0]
-    newPaddleX = mouseX - paddle.width div 2
-    displacement = ball.velocity * dt
-
+proc setPaddleLocation(mouseX: int) =
+  var newPaddleX = mouseX - paddle.width div 2
+  if newPaddleX < 0:
+    newPaddleX = 0
+  elif newPaddleX > playAreaWidth - paddle.width:
+    newPaddleX = playAreaWidth - paddle.width
   paddle.x = newPaddleX
+
+proc centerBallOnPaddle() =
+  ball.location = newVector2D(paddle.x.float + paddle.width / 2, paddle.y.float - ball.radius.float)
+
+proc gameUpdate(dt: float32) =
+  let mouseX = mouse()[0]  
+  setPaddleLocation(mouseX)
+  if not isRunning:
+    centerBallOnPaddle()
+    if key(K_SPACE):
+      isRunning = true
+      ball.velocity = newVector2D(150.0, 270.0)
+      if lives == 0:
+        reset()
+
+  let displacement = ball.velocity * dt
 
   if bounceOffWalls(dt):
     onWallBounce()
 
-  # TODO: Call this for each brick until one has been hit
   if collideWithBricks(displacement):
     onBrickHit()
   elif not collideBallAndPaddle(dt):
@@ -128,8 +154,19 @@ proc gameDraw() =
   ball.render()
   setColor(13)
   paddle.render()
+  setColor(12)
+  print("Lives: " & $lives, 4, 246)
+  print("Score: " & $score, 4, 236)
+  if not isRunning:
+    if lives > 0:
+      printc("Press Space to Start", playAreaWidth div 2, playAreaHeight div 2)
+    else:
+      printc("Game Over!", playAreaWidth div 2, playAreaHeight div 2)
+      printc("Press Space to Play Again", playAreaWidth div 2, playAreaHeight div 2 + 8)
+  setColor(13)
   for brick in bricks:
     brick.render
+
 
 nico.init("myOrg", "myApp")
 nico.createWindow("myApp", playAreaWidth, playAreaHeight, 1, false)

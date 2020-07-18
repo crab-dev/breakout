@@ -11,7 +11,11 @@ proc newBall*(x, y: float, radius: int): Ball =
   return Ball(x: x, y: y, radius: radius) 
 
 proc location*(this: Ball): Vector2D {.inline.} =
-  (this.x, this.y)
+  newVector2D(this.x, this.y)
+
+proc `location=`*(this: Ball, loc: Vector2D) {.inline.} =
+  this.x = loc.x
+  this.y = loc.y
 
 proc left*(this: Ball): float {.inline.} =
   this.x - this.radius.float
